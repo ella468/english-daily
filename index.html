@@ -44,9 +44,11 @@ h2 { margin: 0 0 8px; }
 .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 4px; }
 .stat b, .nums b { font-size: 26px; font-variant-numeric: tabular-nums; }
 .stat span, .nums span { font-size: 13px; color: var(--muted); }
-.tabs { display: flex; gap: 8px; margin-top: 12px; }
-.tab { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 16px; }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; }
+.tab { display: flex; flex-direction: column; align-items: center; padding: 8px 2px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 15px; }
+.tab small { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .tab.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.tab.on small { color: var(--accent-ink); opacity: .85; }
 .nums { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 12px; }
 .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--accent); }
@@ -71,7 +73,8 @@ select { font-size: 16px; padding: 6px 8px; border-radius: 8px; border: 1px soli
 .topbar { display: flex; justify-content: space-between; align-items: center; padding-top: 8px; }
 .card { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 28px 16px 20px; text-align: center; margin-top: 8px; }
 .badge { position: absolute; top: 12px; left: 12px; background: var(--accent-soft); color: var(--accent); font-size: 12px; padding: 2px 8px; border-radius: 999px; }
-.front.word { font-size: 44px; font-weight: 700; letter-spacing: .5px; overflow-wrap: anywhere; }
+.front.word { font-size: 44px; font-weight: 700; letter-spacing: .5px; overflow-wrap: break-word; }
+.front.word.long { font-size: 32px; }
 .front.sentence { font-size: 26px; font-weight: 600; line-height: 1.35; }
 .ipa { color: var(--muted); font-size: 18px; margin-top: 4px; }
 .back { border-top: 1px dashed var(--line); margin-top: 20px; padding-top: 16px; }

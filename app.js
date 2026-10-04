@@ -181,7 +181,9 @@ if (typeof document !== "undefined") {
 
     const tabs = el("div", "tabs");
     Object.entries(DECKS).forEach(([key, d]) => {
-      const b = el("button", "tab" + (key === deck ? " on" : ""), d.title);
+      const b = el("button", "tab" + (key === deck ? " on" : ""));
+      const left = buildQueue(state, key, day).length;
+      b.append(el("span", null, d.title), el("small", null, left ? `今日 ${left}` : "已完成"));
       b.onclick = () => {
         deck = key;
         try { localStorage.setItem(STORE_KEY + ":deck", key); } catch (e) {}
@@ -318,7 +320,7 @@ if (typeof document !== "undefined") {
   function renderCard() {
     if (!queue.length) return renderFinish();
     const item = queue[0];
-    const isWord = deck === "words";
+    const isWord = !!item.ipa;
     app.replaceChildren();
 
     const top = el("div", "topbar");
@@ -330,7 +332,7 @@ if (typeof document !== "undefined") {
     const card = el("div", "card");
     const isNew = !state.cards[item.id];
     if (isNew) card.append(el("span", "badge", "新"));
-    card.append(el("div", isWord ? "front word" : "front sentence", item.front));
+    card.append(el("div", isWord ? (item.front.length > 11 ? "front word long" : "front word") : "front sentence", item.front));
     if (item.ipa) card.append(el("div", "ipa", item.ipa));
 
     const play = el("div", "row center");
