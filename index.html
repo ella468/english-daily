@@ -97,11 +97,18 @@ select { font-size: 16px; padding: 6px 8px; border-radius: 8px; border: 1px soli
 .btn.grade.bad { background: var(--bad); } .btn.grade.mid { background: var(--mid); } .btn.grade.good { background: var(--good); }
 @media (prefers-color-scheme: dark) { .btn.grade { color: #111; } }
 .finish { text-align: center; margin-top: 40px; }
+.parts { margin-top: 12px; text-align: left; }
+.part { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; background: var(--accent-soft); border-radius: 12px; margin-top: 8px; }
+.part b { font-size: 19px; }
+.part .how { font-size: 14px; color: var(--muted); margin-top: 2px; }
 </style>
 </head>
 <body>
 <div id="app"></div>
 <script src="data.js"></script>
+<script src="data-more.js"></script>
+<script src="cet.js"></script>
+<script src="decks.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

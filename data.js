@@ -589,20 +589,3 @@ const HEALTH = [
 ["diet","/ˈdaɪət/","n. 饮食；节食","I'm on a diet.","我在节食。"],
 ["stress","/stres/","n. 压力","I'm under a lot of stress.","我压力很大。"],
 ];
-
-function wordDeck(prefix, title, list) {
-  return { title, items: list.map(([w, ipa, cn, ex, exCn]) => ({ id: prefix + ":" + w, front: w, ipa, cn, ex, exCn })) };
-}
-
-const DECKS = {
-  words: wordDeck("w", "基础单词", WORDS),
-  phrases: {
-    title: "口语句子",
-    items: PHRASES.map(([en, cn]) => ({ id: "p:" + en, front: en, cn })),
-  },
-  travel: wordDeck("t", "旅游出行", TRAVEL),
-  business: wordDeck("b", "商务职场", BUSINESS),
-  finance: wordDeck("f", "财务会计", FINANCE),
-  dining: wordDeck("d", "餐饮购物", DINING),
-  health: wordDeck("h", "健康医疗", HEALTH),
-};

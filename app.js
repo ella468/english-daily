@@ -320,7 +320,8 @@ if (typeof document !== "undefined") {
   function renderCard() {
     if (!queue.length) return renderFinish();
     const item = queue[0];
-    const isWord = !!item.ipa;
+    const isWord = item.kind !== "sentence";
+    const isRoot = item.kind === "root";
     app.replaceChildren();
 
     const top = el("div", "topbar");
@@ -335,13 +336,17 @@ if (typeof document !== "undefined") {
     card.append(el("div", isWord ? (item.front.length > 11 ? "front word long" : "front word") : "front sentence", item.front));
     if (item.ipa) card.append(el("div", "ipa", item.ipa));
 
-    const play = el("div", "row center");
-    const b1 = el("button", "btn round", "发音");
-    b1.onclick = () => speak(item.front);
-    const b2 = el("button", "btn round", "慢速");
-    b2.onclick = () => speak(item.front, 0.5);
-    play.append(b1, b2);
-    card.append(play);
+    if (isRoot) {
+      card.append(el("p", "muted small", "想一想这个词根是什么意思，能想到哪些单词？"));
+    } else {
+      const play = el("div", "row center");
+      const b1 = el("button", "btn round", "发音");
+      b1.onclick = () => speak(item.front);
+      const b2 = el("button", "btn round", "慢速");
+      b2.onclick = () => speak(item.front, 0.5);
+      play.append(b1, b2);
+      card.append(play);
+    }
 
     const back2 = el("div", "back hidden");
     back2.append(el("div", "cn", item.cn));
@@ -353,7 +358,20 @@ if (typeof document !== "undefined") {
       ex.append(exText, el("div", "ex-cn muted", item.exCn), exPlay);
       back2.append(ex);
     }
-    back2.append(renderPractice(item.ex || item.front));
+    if (item.parts) {
+      const list = el("div", "parts");
+      item.parts.forEach(([w, how, cn]) => {
+        const row = el("div", "part");
+        const txt = el("div");
+        txt.append(el("b", null, w), el("span", "muted", "  " + cn), el("div", "how", how));
+        const p = el("button", "btn small", "发音");
+        p.onclick = () => speak(w);
+        row.append(txt, p);
+        list.append(row);
+      });
+      back2.append(list);
+    }
+    back2.append(renderPractice(item.ex || item.say || item.front));
     card.append(back2);
     app.append(card);
 
@@ -366,7 +384,7 @@ if (typeof document !== "undefined") {
     actions.append(reveal);
     app.append(actions);
 
-    speak(item.front);
+    if (!isRoot) speak(item.front);
   }
 
   function gradeButtons(item) {
