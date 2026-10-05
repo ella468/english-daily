@@ -162,31 +162,58 @@ if (typeof document !== "undefined") {
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   // ---------- tap a word to hear it ----------
+  // Hand-written entries win over the imported exam lists.
   const DICT = new Map();
-  Object.values(DECKS).forEach((d) => d.items.forEach((it) => {
+  const addDeck = (d) => d.items.forEach((it) => {
     if (it.kind === "word" && it.ipa) {
       const k = it.front.toLowerCase();
       if (!DICT.has(k)) DICT.set(k, it);
     }
-  }));
+  });
+  Object.entries(DECKS).filter(([k]) => !k.startsWith("cet")).forEach(([, d]) => addDeck(d));
+  [...COMMON, ...SUPP].forEach(([w, ipa, cn]) => { if (!DICT.has(w)) DICT.set(w, { front: w, ipa, cn }); });
+  addDeck(DECKS.cet4);
+  addDeck(DECKS.cet6);
+  // Words inside phrases like "double room" borrow their slice of the phrase's IPA.
+  [...DICT.values()].forEach((it) => {
+    const parts = it.front.toLowerCase().split(/[\s-]+/);
+    const sounds = it.ipa.replace(/^\/|\/$/g, "").split(/\s+/);
+    if (parts.length < 2 || parts.length !== sounds.length) return;
+    parts.forEach((p, i) => {
+      if (!DICT.has(p)) DICT.set(p, { front: p, ipa: "/" + sounds[i] + "/", cn: `（见词组 ${it.front}：${it.cn}）` });
+    });
+  });
 
-  COMMON.forEach(([w, ipa, cn]) => { if (!DICT.has(w)) DICT.set(w, { front: w, ipa, cn }); });
-
-  function lookup(raw) {
-    const w = raw.toLowerCase().replace(/’/g, "'");
+  function lookupOne(w) {
+    if (DICT.has(w)) return DICT.get(w);
+    const b = w.replace(/'s$/, "");
     const cands = [
-      w, w.replace(/'s$/, ""), w.replace(/ies$/, "y"), w.replace(/es$/, ""), w.replace(/s$/, ""),
-      w.replace(/ied$/, "y"), w.replace(/([a-z])\1(ed|ing)$/, "$1"), w.replace(/ed$/, ""), w.replace(/d$/, ""),
-      w.replace(/ing$/, ""), w.replace(/ing$/, "e"), w.replace(/ly$/, ""),
+      b, b.replace(/ies$/, "y"), b.replace(/s$/, ""), b.replace(/es$/, ""),
+      b.replace(/ied$/, "y"), b.replace(/([a-z])\1(ed|ing|er|est)$/, "$1"), b.replace(/ed$/, ""), b.replace(/d$/, ""),
+      b.replace(/ing$/, ""), b.replace(/ing$/, "e"), b.replace(/ily$/, "y"), b.replace(/ly$/, ""),
+      b.replace(/ier$/, "y"), b.replace(/iest$/, "y"), b.replace(/er$/, ""), b.replace(/est$/, ""), b.replace(/r$/, ""), b.replace(/st$/, ""),
     ];
     for (const c of cands) if (DICT.has(c)) return DICT.get(c);
     return null;
   }
 
+  function lookup(raw) {
+    const w = raw.toLowerCase().replace(/’/g, "'");
+    const hit = lookupOne(w);
+    if (hit || !w.includes("-")) return hit;
+    const parts = w.split("-").map(lookupOne);
+    if (parts.some((p) => !p)) return null;
+    return {
+      front: parts.map((p) => p.front).join("-"),
+      ipa: "/" + parts.map((p) => p.ipa.replace(/^\/|\/$/g, "")).join(" ") + "/",
+      cn: parts.map((p) => p.front + " " + p.cn).join("；"),
+    };
+  }
+
   function tappable(tag, cls, text) {
     const e = el(tag, cls);
     text.split(/(\s+)/).forEach((tok) => {
-      const m = tok.match(/^([^A-Za-z]*)([A-Za-z](?:[A-Za-z'’-]*[A-Za-z])?)([^A-Za-z]*)$/);
+      const m = tok.match(/^([^A-Za-zÀ-ÿ]*)([A-Za-zÀ-ÿ](?:[A-Za-zÀ-ÿ'’-]*[A-Za-zÀ-ÿ])?)([^A-Za-zÀ-ÿ]*)$/);
       if (!m) { e.append(tok); return; }
       if (m[1]) e.append(m[1]);
       const s = el("span", "tw", m[2]);
@@ -597,7 +624,7 @@ if (typeof document !== "undefined") {
     const isNew = !state.cards[item.id];
     if (isNew) card.append(el("span", "badge", "新"));
     const frontCls = isWord ? (item.front.length > 11 ? "front word long" : "front word") : "front sentence";
-    card.append(item.front.includes(" ") ? tappable("div", frontCls, item.front) : el("div", frontCls, item.front));
+    card.append(!isRoot && item.front.includes(" ") ? tappable("div", frontCls, item.front) : el("div", frontCls, item.front));
     if (item.ipa) card.append(el("div", "ipa", item.ipa));
 
     if (isRoot) {
