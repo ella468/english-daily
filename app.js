@@ -161,6 +161,74 @@ if (typeof document !== "undefined") {
   }
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
+  // ---------- tap a word to hear it ----------
+  const DICT = new Map();
+  Object.values(DECKS).forEach((d) => d.items.forEach((it) => {
+    if (it.kind === "word" && it.ipa) {
+      const k = it.front.toLowerCase();
+      if (!DICT.has(k)) DICT.set(k, it);
+    }
+  }));
+
+  COMMON.forEach(([w, ipa, cn]) => { if (!DICT.has(w)) DICT.set(w, { front: w, ipa, cn }); });
+
+  function lookup(raw) {
+    const w = raw.toLowerCase().replace(/’/g, "'");
+    const cands = [
+      w, w.replace(/'s$/, ""), w.replace(/ies$/, "y"), w.replace(/es$/, ""), w.replace(/s$/, ""),
+      w.replace(/ied$/, "y"), w.replace(/([a-z])\1(ed|ing)$/, "$1"), w.replace(/ed$/, ""), w.replace(/d$/, ""),
+      w.replace(/ing$/, ""), w.replace(/ing$/, "e"), w.replace(/ly$/, ""),
+    ];
+    for (const c of cands) if (DICT.has(c)) return DICT.get(c);
+    return null;
+  }
+
+  function tappable(tag, cls, text) {
+    const e = el(tag, cls);
+    text.split(/(\s+)/).forEach((tok) => {
+      const m = tok.match(/^([^A-Za-z]*)([A-Za-z](?:[A-Za-z'’-]*[A-Za-z])?)([^A-Za-z]*)$/);
+      if (!m) { e.append(tok); return; }
+      if (m[1]) e.append(m[1]);
+      const s = el("span", "tw", m[2]);
+      s.onclick = () => showWord(m[2]);
+      e.append(s);
+      if (m[3]) e.append(m[3]);
+    });
+    return e;
+  }
+
+  let sheet = null;
+  function closeSheet() {
+    if (sheet) { sheet.remove(); sheet = null; }
+  }
+  function showWord(w) {
+    closeSheet();
+    stopPlay();
+    const info = lookup(w);
+    const bg = el("div", "sheet-bg");
+    bg.onclick = closeSheet;
+    const sh = el("div", "sheet");
+    sh.append(el("div", "sheet-word", w));
+    if (info) {
+      sh.append(el("div", "ipa", info.ipa), el("div", "sheet-cn", info.cn));
+      if (info.front.toLowerCase() !== w.toLowerCase()) sh.append(el("div", "muted small", "词库里的形式：" + info.front));
+    }
+    const letters = w.toUpperCase().replace(/[^A-Z]/g, "").split("").join(", ");
+    const row = el("div", "row center");
+    [["发音", () => speak(w)], ["慢速", () => speak(w, 0.4)], ["拼字母", () => speak(letters, 0.7)]].forEach(([t, f]) => {
+      const b = el("button", "btn round", t);
+      b.onclick = f;
+      row.append(b);
+    });
+    const close = el("button", "btn big", "关闭");
+    close.onclick = closeSheet;
+    sh.append(row, close);
+    sheet = el("div");
+    sheet.append(bg, sh);
+    app.append(sheet);
+    speak(w);
+  }
+
   // ---------- views ----------
   const app = $("#app");
 
@@ -406,7 +474,7 @@ if (typeof document !== "undefined") {
     const rows = L.lines.map(([spk, en, cn]) => {
       const row = el("div", "line");
       if (spk) row.append(el("div", "spk", spk));
-      row.append(el("div", "line-en", en), el("div", "line-cn", cn));
+      row.append(tappable("div", "line-en", en), el("div", "line-cn", cn));
       const btns = el("div", "line-btns");
       const listen = el("button", "btn small", "听");
       listen.onclick = () => { stopPlay(); speak(en, null, { voice: voiceOf(spk) }); };
@@ -528,7 +596,8 @@ if (typeof document !== "undefined") {
     const card = el("div", "card");
     const isNew = !state.cards[item.id];
     if (isNew) card.append(el("span", "badge", "新"));
-    card.append(el("div", isWord ? (item.front.length > 11 ? "front word long" : "front word") : "front sentence", item.front));
+    const frontCls = isWord ? (item.front.length > 11 ? "front word long" : "front word") : "front sentence";
+    card.append(item.front.includes(" ") ? tappable("div", frontCls, item.front) : el("div", frontCls, item.front));
     if (item.ipa) card.append(el("div", "ipa", item.ipa));
 
     if (isRoot) {
@@ -547,7 +616,7 @@ if (typeof document !== "undefined") {
     back2.append(el("div", "cn", item.cn));
     if (item.ex) {
       const ex = el("div", "ex");
-      const exText = el("div", "ex-en", item.ex);
+      const exText = tappable("div", "ex-en", item.ex);
       const exPlay = el("button", "btn small", "听例句");
       exPlay.onclick = () => speak(item.ex);
       ex.append(exText, el("div", "ex-cn muted", item.exCn), exPlay);
@@ -612,7 +681,7 @@ if (typeof document !== "undefined") {
   function renderPractice(text) {
     const box = el("div", "practice");
     box.append(el("div", "practice-title", "跟读练习"));
-    const tip = el("p", "muted small", "先听一遍，再大声跟着读。");
+    const tip = el("p", "muted small", "先听一遍，再大声跟着读。读不准的单词，点一下就能单独听。");
     const result = el("div", "result");
     const row = el("div", "row center");
 
@@ -674,7 +743,11 @@ if (typeof document !== "undefined") {
     result.replaceChildren();
     const s = el("div", "score " + (m.score >= 80 ? "good" : m.score >= 50 ? "mid" : "bad"), m.score + " 分");
     const line = el("div", "words");
-    m.words.forEach((w, i) => line.append(el("span", m.hit[i] ? "hit" : "miss", w), " "));
+    m.words.forEach((w, i) => {
+      const s = el("span", "tw " + (m.hit[i] ? "hit" : "miss"), w);
+      s.onclick = () => showWord(w);
+      line.append(s, " ");
+    });
     result.append(s, line, el("p", "muted small", "听到的是：" + heard));
   }
 

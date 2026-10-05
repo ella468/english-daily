@@ -1,4 +1,4 @@
-const CACHE = "english-daily-v4";
+const CACHE = "english-daily-v5";
 const FILES = ["./", "index.html", "app.js", "data.js", "data-more.js", "cet.js", "lessons.js", "decks.js", "manifest.webmanifest", "icon-180.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {
