@@ -97,6 +97,23 @@ select { font-size: 16px; padding: 6px 8px; border-radius: 8px; border: 1px soli
 .btn.grade.bad { background: var(--bad); } .btn.grade.mid { background: var(--mid); } .btn.grade.good { background: var(--good); }
 @media (prefers-color-scheme: dark) { .btn.grade { color: #111; } }
 .finish { text-align: center; margin-top: 40px; }
+.lesson-head h2 { margin: 12px 0 0; font-size: 24px; }
+.lesson-head p { margin: 2px 0 0; }
+.lesson-text { padding: 8px 12px; }
+.line { padding: 10px 6px; border-bottom: 1px solid var(--line); border-radius: 8px; }
+.line:last-child { border-bottom: none; }
+.line.playing { background: var(--accent-soft); }
+.spk { font-size: 12px; font-weight: 600; color: var(--accent); }
+.line-en { font-size: 18px; line-height: 1.45; }
+.line-cn { color: var(--muted); font-size: 15px; }
+.no-cn .line-cn { display: none; }
+.line-btns { display: flex; gap: 6px; margin-top: 6px; }
+.word-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.word-row:last-child { border-bottom: none; }
+.lesson-list .lvl { font-weight: 600; color: var(--muted); font-size: 14px; margin: 10px 0 2px; }
+.lesson-row { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; background: none; border: none; border-bottom: 1px solid var(--line); padding: 12px 2px; text-align: left; color: var(--text); font-size: 16px; }
+.lesson-row .ok { color: var(--good); font-weight: 600; }
+.lesson-actions { margin: 8px 0 24px; }
 .parts { margin-top: 12px; text-align: left; }
 .part { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; background: var(--accent-soft); border-radius: 12px; margin-top: 8px; }
 .part b { font-size: 19px; }
@@ -108,6 +125,7 @@ select { font-size: 16px; padding: 6px 8px; border-radius: 8px; border: 1px soli
 <script src="data.js"></script>
 <script src="data-more.js"></script>
 <script src="cet.js"></script>
+<script src="lessons.js"></script>
 <script src="decks.js"></script>
 <script src="app.js"></script>
 </body>

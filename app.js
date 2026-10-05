@@ -11,7 +11,7 @@ function addDays(dateStr, n) {
 }
 
 function defaultState() {
-  return { settings: { newPerDay: 10, rate: 0.8 }, cards: {}, log: {} };
+  return { settings: { newPerDay: 10, rate: 0.8 }, cards: {}, log: {}, lessons: {} };
 }
 
 function dayLog(state, day) {
@@ -28,7 +28,7 @@ function buildQueue(state, deck, day, extraNew = 0) {
   const due = items
     .filter((it) => state.cards[it.id] && state.cards[it.id].due <= day)
     .sort((a, b) => (state.cards[a.id].due < state.cards[b.id].due ? -1 : 1));
-  const newLeft = Math.max(0, state.settings.newPerDay - newLearnedToday(state, deck, day)) + extraNew;
+  const newLeft = DECKS[deck].noFresh ? 0 : Math.max(0, state.settings.newPerDay - newLearnedToday(state, deck, day)) + extraNew;
   const fresh = items.filter((it) => !state.cards[it.id]).slice(0, newLeft);
   return [...due, ...fresh];
 }
@@ -135,24 +135,28 @@ if (typeof document !== "undefined") {
 
   // ---------- speech ----------
   let voice = null;
+  let voice2 = null;
   function pickVoice() {
     const vs = speechSynthesis.getVoices().filter((v) => v.lang && v.lang.replace("_", "-").startsWith("en"));
-    voice =
-      vs.find((v) => /en-US/i.test(v.lang.replace("_", "-")) && /Samantha|Ava|Allison|Susan/i.test(v.name)) ||
-      vs.find((v) => /en-US/i.test(v.lang.replace("_", "-"))) ||
-      vs[0] || null;
+    const us = (v) => /en-US/i.test(v.lang.replace("_", "-"));
+    voice = vs.find((v) => us(v) && /Samantha|Ava|Allison|Susan/i.test(v.name)) || vs.find(us) || vs[0] || null;
+    voice2 =
+      vs.find((v) => v !== voice && us(v) && /Fred|Aaron|Alex|Tom|Nathan|Evan/i.test(v.name)) ||
+      vs.find((v) => v !== voice && /Daniel|Arthur/i.test(v.name)) ||
+      vs.find((v) => v !== voice && us(v)) || null;
   }
   if ("speechSynthesis" in window) {
     pickVoice();
     speechSynthesis.onvoiceschanged = pickVoice;
   }
-  function speak(text, rate) {
+  function speak(text, rate, opts = {}) {
     if (!("speechSynthesis" in window)) return;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "en-US";
-    if (voice) u.voice = voice;
+    if (opts.voice || voice) u.voice = opts.voice || voice;
     u.rate = rate || state.settings.rate;
+    if (opts.onend) u.onend = opts.onend;
     speechSynthesis.speak(u);
   }
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -183,7 +187,9 @@ if (typeof document !== "undefined") {
     Object.entries(DECKS).forEach(([key, d]) => {
       const b = el("button", "tab" + (key === deck ? " on" : ""));
       const left = buildQueue(state, key, day).length;
-      b.append(el("span", null, d.title), el("small", null, left ? `今日 ${left}` : "已完成"));
+      let label = left ? `今日 ${left}` : "已完成";
+      if (key === "lessons" && !left && nextLesson() >= 0) label = `第 ${nextLesson() + 1} 课`;
+      b.append(el("span", null, d.title), el("small", null, label));
       b.onclick = () => {
         deck = key;
         try { localStorage.setItem(STORE_KEY + ":deck", key); } catch (e) {}
@@ -192,6 +198,12 @@ if (typeof document !== "undefined") {
       tabs.append(b);
     });
     wrap.append(tabs);
+
+    if (deck === "lessons") {
+      wrap.append(renderLessonsPanel(day), renderSettings(), renderHelp());
+      app.append(wrap);
+      return;
+    }
 
     const q = buildQueue(state, deck, day);
     const dueN = q.filter((it) => state.cards[it.id]).length;
@@ -305,6 +317,189 @@ if (typeof document !== "undefined") {
     box.append(ol);
     box.append(el("p", "muted small", "学习方法：每天先完成「待复习」，再学新内容。每张卡片都先听发音、跟着大声读，再判断认不认识。"));
     return box;
+  }
+
+  // ---------- lessons ----------
+  function lessonDone(i) { return !!(state.lessons && state.lessons[i]); }
+  function nextLesson() { return LESSONS.findIndex((_, i) => !lessonDone(i)); }
+
+  function renderLessonsPanel(day) {
+    const box = el("div");
+    const q = buildQueue(state, "lessons", day);
+    const done = LESSONS.filter((_, i) => lessonDone(i)).length;
+    const nx = nextLesson();
+
+    const card = el("div", "panel today");
+    const nums = el("div", "nums");
+    [[q.length, "待复习"], [`${done}/${LESSONS.length}`, "已学课文"]].forEach(([n, label]) => {
+      const s = el("div");
+      s.append(el("b", null, String(n)), el("span", null, label));
+      nums.append(s);
+    });
+    card.append(nums);
+    if (q.length) {
+      const rb = el("button", "btn big", `复习学过的句子和单词（${q.length}）`);
+      rb.onclick = () => startSession(q);
+      card.append(rb);
+    }
+    if (nx >= 0) {
+      const lb = el("button", "btn primary big", `学习第 ${nx + 1} 课：${LESSONS[nx].title}`);
+      lb.onclick = () => renderLesson(nx);
+      card.append(lb);
+    } else {
+      card.append(el("p", "done-msg", "全部课文都学完了！坚持复习。"));
+    }
+    box.append(card);
+
+    const LEVELS = { 1: "第一阶段 · 入门对话", 2: "第二阶段 · 短文故事" };
+    const list = el("div", "panel lesson-list");
+    let lvl = 0;
+    LESSONS.forEach((L, i) => {
+      if (L.level !== lvl) { lvl = L.level; list.append(el("div", "lvl", LEVELS[lvl] || "")); }
+      const row = el("button", "lesson-row");
+      const t = el("div");
+      t.append(el("b", null, `${i + 1}. ${L.title}`), el("div", "muted small", L.cn));
+      row.append(t, el("span", "small " + (lessonDone(i) ? "ok" : "muted"), lessonDone(i) ? "已学" : i === nx ? "下一课" : ""));
+      row.onclick = () => renderLesson(i);
+      list.append(row);
+    });
+    box.append(list);
+    return box;
+  }
+
+  let playToken = 0;
+  let onStop = null;
+  function stopPlay() {
+    playToken++;
+    if (onStop) { onStop(); onStop = null; }
+    if (window.speechSynthesis) speechSynthesis.cancel();
+  }
+
+  function renderLesson(i) {
+    stopPlay();
+    stopRecording();
+    const L = LESSONS[i];
+    const speakers = [...new Set(L.lines.map((l) => l[0]).filter(Boolean))];
+    const voiceOf = (spk) => (voice2 && speakers.indexOf(spk) % 2 === 1 ? voice2 : voice);
+    app.replaceChildren();
+    if (window.scrollTo) window.scrollTo(0, 0);
+
+    const top = el("div", "topbar");
+    const back = el("button", "link", "‹ 返回");
+    back.onclick = () => { stopPlay(); stopRecording(); renderHome(); };
+    top.append(back, el("span", "muted", `第 ${i + 1} 课 / 共 ${LESSONS.length} 课`));
+    app.append(top);
+
+    const head = el("div", "lesson-head");
+    head.append(el("h2", null, L.title), el("p", "muted", L.cn));
+    app.append(head);
+
+    let showCn = true;
+    try { showCn = localStorage.getItem(STORE_KEY + ":cn") !== "0"; } catch (e) {}
+    const ctrl = el("div", "row");
+    const playBtn = el("button", "btn primary", "播放全文");
+    const cnBtn = el("button", "btn", showCn ? "隐藏中文" : "显示中文");
+    ctrl.append(playBtn, cnBtn);
+    app.append(ctrl);
+
+    const text = el("div", "panel lesson-text" + (showCn ? "" : " no-cn"));
+    const rows = L.lines.map(([spk, en, cn]) => {
+      const row = el("div", "line");
+      if (spk) row.append(el("div", "spk", spk));
+      row.append(el("div", "line-en", en), el("div", "line-cn", cn));
+      const btns = el("div", "line-btns");
+      const listen = el("button", "btn small", "听");
+      listen.onclick = () => { stopPlay(); speak(en, null, { voice: voiceOf(spk) }); };
+      const practiceBtn = el("button", "btn small", "跟读");
+      let practice = null;
+      practiceBtn.onclick = () => {
+        if (practice) { stopRecording(); practice.remove(); practice = null; return; }
+        practice = renderPractice(en);
+        row.append(practice);
+      };
+      btns.append(listen, practiceBtn);
+      row.append(btns);
+      text.append(row);
+      return row;
+    });
+    app.append(text);
+
+    cnBtn.onclick = () => {
+      showCn = !showCn;
+      if (showCn) text.classList.remove("no-cn"); else text.classList.add("no-cn");
+      cnBtn.textContent = showCn ? "隐藏中文" : "显示中文";
+      try { localStorage.setItem(STORE_KEY + ":cn", showCn ? "1" : "0"); } catch (e) {}
+    };
+
+    const resetPlay = () => {
+      playBtn.textContent = "播放全文";
+      rows.forEach((r) => r.classList.remove("playing"));
+    };
+    playBtn.onclick = () => {
+      if (onStop === resetPlay) { stopPlay(); return; }
+      stopPlay();
+      const token = playToken;
+      onStop = resetPlay;
+      playBtn.textContent = "停止";
+      const step = (j) => {
+        if (token !== playToken) return;
+        rows.forEach((r) => r.classList.remove("playing"));
+        if (j >= L.lines.length) { resetPlay(); onStop = null; return; }
+        rows[j].classList.add("playing");
+        const [spk, en] = L.lines[j];
+        speak(en, null, { voice: voiceOf(spk), onend: () => setTimeout(() => step(j + 1), 400) });
+      };
+      step(0);
+    };
+
+    const wp = el("div", "panel");
+    wp.append(el("div", "practice-title", "生词"));
+    L.words.forEach(([w, ipa, cn]) => {
+      const r = el("div", "word-row");
+      const t = el("div");
+      t.append(el("b", null, w), el("span", "muted small", "  " + ipa), el("div", "small", cn));
+      const p = el("button", "btn small", "发音");
+      p.onclick = () => { stopPlay(); speak(w); };
+      r.append(t, p);
+      wp.append(r);
+    });
+    app.append(wp);
+
+    const pp = el("div", "panel");
+    pp.append(el("div", "practice-title", "学习要点"), el("p", null, L.point));
+    app.append(pp);
+
+    const actions = el("div", "lesson-actions");
+    if (!lessonDone(i)) {
+      const fin = el("button", "btn primary big", "学完了，加入复习");
+      fin.onclick = () => { finishLesson(i); renderLesson(i); };
+      actions.append(fin, el("p", "muted small", "建议：先听全文，再逐句跟读，最后关掉中文也能读懂，再点这里。"));
+    } else {
+      actions.append(el("p", "done-msg", "本课已学完，句子和生词会按计划复习。"));
+    }
+    if (i + 1 < LESSONS.length) {
+      const nb = el("button", "btn big", "下一课 ›");
+      nb.onclick = () => renderLesson(i + 1);
+      actions.append(nb);
+    }
+    app.append(actions);
+  }
+
+  function finishLesson(i) {
+    const day = today();
+    const prefix = "l" + (i + 1) + ":";
+    let n = 0;
+    DECKS.lessons.items.forEach((it) => {
+      if (it.id.startsWith(prefix) && !state.cards[it.id]) {
+        state.cards[it.id] = { reps: 1, iv: 1, ef: 2.5, due: addDays(day, 1), lapses: 0 };
+        n++;
+      }
+    });
+    const log = dayLog(state, day);
+    log.new.lessons = (log.new.lessons || 0) + n;
+    if (!state.lessons) state.lessons = {};
+    state.lessons[i] = day;
+    save();
   }
 
   // ---------- session ----------

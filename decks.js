@@ -11,12 +11,25 @@ const cet4 = CET4.filter((r) => !KNOWN.has(r[0].toLowerCase()));
 cet4.forEach((r) => KNOWN.add(r[0].toLowerCase()));
 const cet6 = CET6.filter((r) => !KNOWN.has(r[0].toLowerCase()));
 
+function lessonItems(L, i) {
+  const n = "l" + (i + 1) + ":";
+  const sentences = L.lines.map(([, en, cn], j) => ({ id: n + "s" + j, kind: "sentence", front: en, cn }));
+  const words = L.words.map(([w, ipa, cn]) => {
+    const lw = w.toLowerCase();
+    const line = L.lines.find((l) => l[1].toLowerCase().includes(lw)) ||
+      L.lines.find((l) => l[1].toLowerCase().includes(lw.split(" ")[0]));
+    return { id: n + "w:" + w, kind: "word", front: w, ipa, cn, ex: line && line[1], exCn: line && line[2] };
+  });
+  return [...sentences, ...words];
+}
+
 const DECKS = {
   words: wordDeck("w", "基础单词", WORDS),
   phrases: {
     title: "口语句子",
     items: PHRASES.map(([en, cn]) => ({ id: "p:" + en, kind: "sentence", front: en, cn })),
   },
+  lessons: { title: "原创课文", noFresh: true, items: LESSONS.flatMap(lessonItems) },
   travel: wordDeck("t", "旅游出行", TRAVEL),
   ads: wordDeck("a", "广告营销", ADS),
   business: wordDeck("b", "商务职场", BUSINESS),
